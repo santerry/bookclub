@@ -28,3 +28,29 @@ Sovelluksessa käyttäjät voivat jakaa lukemiaan kirjoja ja kirjoittaa niistä 
 
 Tässä pääasiallinen tietokohde on kirja ja toissijainen tietokohde on arvio.
 
+
+
+\## Sovelluksen käynnistäminen
+
+
+
+1\. Asenna riippuvuudet:
+
+pip install flask
+
+
+
+2\. Luo tietokanta:
+
+python init\_db.py
+
+
+
+3\. Käynnistä sovellus:
+
+flask run
+
+
+
+4\. Avaa selaimessa osoite `http://127.0.0.1:5000`
+
