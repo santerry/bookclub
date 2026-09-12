@@ -5,6 +5,13 @@
 </head>
 <body>
     <h1>Bookclub</h1>
+
+    {% if session.username %}
+        <p>Logged in as {{ session.username }} — <a href="/logout">Log out</a></p>
+    {% else %}
+        <p><a href="/login">Log in</a> or <a href="/register">Register</a></p>
+    {% endif %}
+
     <ul>
         {% for book in books %}
         <li>{{ book.title }} by {{ book.author }}</li>
