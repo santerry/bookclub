@@ -12,10 +12,21 @@ def get_db_connection():
 
 @app.route("/")
 def index():
+    query = request.args.get("query", "")
+
     con = get_db_connection()
-    books = con.execute("SELECT id, title, author, description, user_id FROM books").fetchall()
+    if query:
+        books = con.execute(
+            "SELECT id, title, author, description, user_id FROM books WHERE title LIKE ? OR author LIKE ?",
+            (f"%{query}%", f"%{query}%")
+        ).fetchall()
+    else:
+        books = con.execute(
+            "SELECT id, title, author, description, user_id FROM books"
+        ).fetchall()
     con.close()
-    return render_template("index.html", books=books)
+
+    return render_template("index.html", books=books, query=query)
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
