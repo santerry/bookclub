@@ -62,3 +62,25 @@ def login():
 def logout():
     session.clear()
     return redirect("/")
+
+@app.route("/books/new", methods=["GET", "POST"])
+def new_book():
+    if "user_id" not in session:
+        return redirect("/login")
+
+    if request.method == "GET":
+        return render_template("new_book.html")
+
+    title = request.form["title"]
+    author = request.form["author"]
+    description = request.form["description"]
+
+    con = get_db_connection()
+    con.execute(
+        "INSERT INTO books (user_id, title, author, description) VALUES (?, ?, ?, ?)",
+        (session["user_id"], title, author, description)
+    )
+    con.commit()
+    con.close()
+
+    return redirect("/")
