@@ -15,7 +15,15 @@
 
     <ul>
         {% for book in books %}
-        <li>{{ book.title }} by {{ book.author }}</li>
+        <li>
+            {{ book.title }} by {{ book.author }}
+            {% if session.user_id == book.user_id %}
+                — <a href="/books/{{ book.id }}/edit">Edit</a>
+                — <form action="/books/{{ book.id }}/delete" method="post" style="display:inline">
+                    <button type="submit">Delete</button>
+                </form>
+            {% endif %}
+        </li>
         {% endfor %}
     </ul>
 </body>

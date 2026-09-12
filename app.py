@@ -13,7 +13,7 @@ def get_db_connection():
 @app.route("/")
 def index():
     con = get_db_connection()
-    books = con.execute("SELECT id, title, author, description FROM books").fetchall()
+    books = con.execute("SELECT id, title, author, description, user_id FROM books").fetchall()
     con.close()
     return render_template("index.html", books=books)
 
@@ -80,6 +80,61 @@ def new_book():
         "INSERT INTO books (user_id, title, author, description) VALUES (?, ?, ?, ?)",
         (session["user_id"], title, author, description)
     )
+    con.commit()
+    con.close()
+
+    return redirect("/")
+
+@app.route("/books/<int:book_id>/edit", methods=["GET", "POST"])
+def edit_book(book_id):
+    if "user_id" not in session:
+        return redirect("/login")
+
+    con = get_db_connection()
+    book = con.execute("SELECT * FROM books WHERE id = ?", (book_id,)).fetchone()
+
+    if book is None:
+        con.close()
+        return "Book not found", 404
+
+    if book["user_id"] != session["user_id"]:
+        con.close()
+        return "Not authorized", 403
+
+    if request.method == "GET":
+        con.close()
+        return render_template("edit_book.html", book=book)
+
+    title = request.form["title"]
+    author = request.form["author"]
+    description = request.form["description"]
+
+    con.execute(
+        "UPDATE books SET title = ?, author = ?, description = ? WHERE id = ?",
+        (title, author, description, book_id)
+    )
+    con.commit()
+    con.close()
+
+    return redirect("/")
+
+@app.route("/books/<int:book_id>/delete", methods=["POST"])
+def delete_book(book_id):
+    if "user_id" not in session:
+        return redirect("/login")
+
+    con = get_db_connection()
+    book = con.execute("SELECT * FROM books WHERE id = ?", (book_id,)).fetchone()
+
+    if book is None:
+        con.close()
+        return "Book not found", 404
+
+    if book["user_id"] != session["user_id"]:
+        con.close()
+        return "Not authorized", 403
+
+    con.execute("DELETE FROM books WHERE id = ?", (book_id,))
     con.commit()
     con.close()
 
