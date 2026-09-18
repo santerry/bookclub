@@ -35,9 +35,24 @@ def register():
 
     username = request.form["username"]
     password = request.form["password"]
-    password_hash = generate_password_hash(password)
+
+    if not username or not password:
+        return "Username and password are required", 400
+
+    if len(username) > 50 or len(password) > 100:
+        return "Username or password too long", 400
 
     con = get_db_connection()
+
+    existing = con.execute(
+        "SELECT id FROM users WHERE username = ?", (username,)
+    ).fetchone()
+
+    if existing is not None:
+        con.close()
+        return "Username already taken", 400
+
+    password_hash = generate_password_hash(password)
     con.execute(
         "INSERT INTO users (username, password_hash) VALUES (?, ?)",
         (username, password_hash)
@@ -86,6 +101,12 @@ def new_book():
     author = request.form["author"]
     description = request.form["description"]
 
+    if not title or not author:
+        return "Title and author are required", 400
+
+    if len(title) > 200 or len(author) > 200:
+        return "Title or author too long", 400
+
     con = get_db_connection()
     con.execute(
         "INSERT INTO books (user_id, title, author, description) VALUES (?, ?, ?, ?)",
@@ -119,6 +140,14 @@ def edit_book(book_id):
     title = request.form["title"]
     author = request.form["author"]
     description = request.form["description"]
+
+    if not title or not author:
+        con.close()
+        return "Title and author are required", 400
+
+    if len(title) > 200 or len(author) > 200:
+        con.close()
+        return "Title or author too long", 400
 
     con.execute(
         "UPDATE books SET title = ?, author = ?, description = ? WHERE id = ?",
