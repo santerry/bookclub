@@ -1,32 +1,26 @@
-import sqlite3
-from flask import Flask, render_template, request, redirect, session
-from werkzeug.security import generate_password_hash, check_password_hash
+from flask import Flask, render_template, request, redirect, session, abort
+import config
+import books
 
 app = Flask(__name__)
-app.secret_key = "replace-this-with-something-random-later"
+app.secret_key = config.secret_key
 
-def get_db_connection():
-    con = sqlite3.connect("database.db")
-    con.row_factory = sqlite3.Row
-    return con
+def require_login():
+    if "user_id" not in session:
+        abort(403)
 
 @app.route("/")
 def index():
-    query = request.args.get("query", "")
+    search_query = request.args.get("query")
+    book_list = books.get_books(search_query)
+    return render_template("index.html", books=book_list, query=search_query)
 
-    con = get_db_connection()
-    if query:
-        books = con.execute(
-            "SELECT id, title, author, description, user_id FROM books WHERE title LIKE ? OR author LIKE ?",
-            (f"%{query}%", f"%{query}%")
-        ).fetchall()
-    else:
-        books = con.execute(
-            "SELECT id, title, author, description, user_id FROM books"
-        ).fetchall()
-    con.close()
-
-    return render_template("index.html", books=books, query=query)
+@app.route("/books/<int:book_id>")
+def show_book(book_id):
+    book = books.get_book(book_id)
+    if not book:
+        abort(404)
+    return render_template("show_book.html", book=book)
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
@@ -37,30 +31,14 @@ def register():
     password = request.form["password"]
 
     if not username or not password:
-        return "Username and password are required", 400
-
+        abort(403)
     if len(username) > 50 or len(password) > 100:
-        return "Username or password too long", 400
+        abort(403)
 
-    con = get_db_connection()
-
-    existing = con.execute(
-        "SELECT id FROM users WHERE username = ?", (username,)
-    ).fetchone()
-
-    if existing is not None:
-        con.close()
-        return "Username already taken", 400
-
-    password_hash = generate_password_hash(password)
-    con.execute(
-        "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-        (username, password_hash)
-    )
-    con.commit()
-    con.close()
-
-    return redirect("/")
+    if books.create_user(username, password):
+        return redirect("/")
+    else:
+        return "Username already taken"
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -70,19 +48,13 @@ def login():
     username = request.form["username"]
     password = request.form["password"]
 
-    con = get_db_connection()
-    user = con.execute(
-        "SELECT id, username, password_hash FROM users WHERE username = ?",
-        (username,)
-    ).fetchone()
-    con.close()
-
-    if user is None or not check_password_hash(user["password_hash"], password):
-        return "Invalid username or password", 401
-
-    session["user_id"] = user["id"]
-    session["username"] = user["username"]
-    return redirect("/")
+    user_id = books.check_login(username, password)
+    if user_id:
+        session["user_id"] = user_id
+        session["username"] = username
+        return redirect("/")
+    else:
+        return "Invalid username or password"
 
 @app.route("/logout")
 def logout():
@@ -91,8 +63,7 @@ def logout():
 
 @app.route("/books/new", methods=["GET", "POST"])
 def new_book():
-    if "user_id" not in session:
-        return redirect("/login")
+    require_login()
 
     if request.method == "GET":
         return render_template("new_book.html")
@@ -102,39 +73,25 @@ def new_book():
     description = request.form["description"]
 
     if not title or not author:
-        return "Title and author are required", 400
-
+        abort(403)
     if len(title) > 200 or len(author) > 200:
-        return "Title or author too long", 400
+        abort(403)
 
-    con = get_db_connection()
-    con.execute(
-        "INSERT INTO books (user_id, title, author, description) VALUES (?, ?, ?, ?)",
-        (session["user_id"], title, author, description)
-    )
-    con.commit()
-    con.close()
-
-    return redirect("/")
+    user_id = session["user_id"]
+    book_id = books.add_book(title, author, description, user_id)
+    return redirect("/books/" + str(book_id))
 
 @app.route("/books/<int:book_id>/edit", methods=["GET", "POST"])
 def edit_book(book_id):
-    if "user_id" not in session:
-        return redirect("/login")
+    require_login()
 
-    con = get_db_connection()
-    book = con.execute("SELECT * FROM books WHERE id = ?", (book_id,)).fetchone()
-
-    if book is None:
-        con.close()
-        return "Book not found", 404
-
+    book = books.get_book(book_id)
+    if not book:
+        abort(404)
     if book["user_id"] != session["user_id"]:
-        con.close()
-        return "Not authorized", 403
+        abort(403)
 
     if request.method == "GET":
-        con.close()
         return render_template("edit_book.html", book=book)
 
     title = request.form["title"]
@@ -142,40 +99,26 @@ def edit_book(book_id):
     description = request.form["description"]
 
     if not title or not author:
-        con.close()
-        return "Title and author are required", 400
-
+        abort(403)
     if len(title) > 200 or len(author) > 200:
-        con.close()
-        return "Title or author too long", 400
+        abort(403)
 
-    con.execute(
-        "UPDATE books SET title = ?, author = ?, description = ? WHERE id = ?",
-        (title, author, description, book_id)
-    )
-    con.commit()
-    con.close()
+    books.update_book(book_id, title, author, description)
+    return redirect("/books/" + str(book_id))
 
-    return redirect("/")
-
-@app.route("/books/<int:book_id>/delete", methods=["POST"])
+@app.route("/books/<int:book_id>/delete", methods=["GET", "POST"])
 def delete_book(book_id):
-    if "user_id" not in session:
-        return redirect("/login")
+    require_login()
 
-    con = get_db_connection()
-    book = con.execute("SELECT * FROM books WHERE id = ?", (book_id,)).fetchone()
-
-    if book is None:
-        con.close()
-        return "Book not found", 404
-
+    book = books.get_book(book_id)
+    if not book:
+        abort(404)
     if book["user_id"] != session["user_id"]:
-        con.close()
-        return "Not authorized", 403
+        abort(403)
 
-    con.execute("DELETE FROM books WHERE id = ?", (book_id,))
-    con.commit()
-    con.close()
+    if request.method == "GET":
+        return render_template("remove_book.html", book=book)
 
+    if "continue" in request.form:
+        books.remove_book(book_id)
     return redirect("/")

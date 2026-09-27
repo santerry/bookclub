@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Delete book - Bookclub</title>
+</head>
+<body>
+    <h1>Delete book</h1>
+    <p>Are you sure you want to delete "{{ book.title }}"?</p>
+    <form action="/books/{{ book.id }}/delete" method="post">
+        <input type="submit" name="continue" value="Yes, delete">
+        <input type="submit" name="cancel" value="Cancel">
+    </form>
+</body>
+</html>

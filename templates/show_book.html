@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ book.title }} - Bookclub</title>
+</head>
+<body>
+    <h1>{{ book.title }}</h1>
+    <p><strong>Author:</strong> {{ book.author }}</p>
+    <p><strong>Description:</strong> {{ book.description }}</p>
+
+    {% if session.user_id == book.user_id %}
+        <p>
+            <a href="/books/{{ book.id }}/edit">Edit</a> |
+            <a href="/books/{{ book.id }}/delete">Delete</a>
+        </p>
+    {% endif %}
+
+    <p><a href="/">Back to book list</a></p>
+</body>
+</html>
